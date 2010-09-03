@@ -1,0 +1,344 @@
+<?
+	include "AdminPodcast.php";
+	$core=new AdminPodcast();
+	
+	if(isset($_GET['act']))
+		$act=$_GET['act'];
+	
+	if(isset($_REQUEST['tabel']))
+		$tabel=$_REQUEST['tabel'];
+	
+	if(isset($_REQUEST['fkd']))
+		$fkd=$_REQUEST['fkd'];
+	
+	if(isset($_REQUEST['kd']))
+		$kd=$_REQUEST['kd'];
+	
+/*
+	contoh query:
+	http://localhost/admin_podcast/engine.php?act=genxml&tabel=pengajar
+	http://localhost/admin_podcast/engine.php?select=*&from=mhs
+	http://localhost/admin_podcast/engine.php?select=nim,namamhs&from=mhs&where=nim like '0900%'
+	http://localhost/admin_podcast/engine.php?select=nim,namamhs&from=mhs&where=nim='0900822930'
+	
+	list mtkul:
+	* mhs
+		http://localhost/admin_podcast/engine.php?act=get_list_mtkul&KdUser=1000849555&StatusUser=m
+	* pengajar
+		http://localhost/admin_podcast/engine.php?act=get_list_mtkul&KdUser=09001&StatusUser=p
+	
+	list pertemuan: (berdasarkan mtkul)
+	* mhs
+		http://localhost/admin_podcast/engine.php?act=get_list_pert&KdPraktikum=pr001
+	* pengajar
+	
+	contoh insert
+	-----------------
+	> forum:
+	http://localhost/admin_podcast/engine.php?act=ins_forum&KdForum=fr501&KdPraktikum=pr001&NamaForum=Forum Sistem Basis Data
+	
+	> pos:
+	http://localhost/admin_podcast/engine.php?act=ins_pos&KdForum=fr501&KdTopik=tp004&KdUser=0900822930&StatusUser=m&Pos=Fungsi datediff() itu buat apa ya?\nParameternya apa aja?
+	http://localhost/admin_podcast/engine.php?act=ins_pos&KdForum=fr501&KdTopik=tp004&KdUser=06010&StatusUser=p&Pos=datediff() itu gunanya untuk menghitung selisih antara 2 waktu.
+	
+*/
+	if(isset($_REQUEST['select']))
+	{
+		$select=$_REQUEST['select'];
+		$from=$_REQUEST['from'];
+		if(isset($_REQUEST['where']))
+			$where=str_replace("-","=",$_REQUEST['where']);
+		else
+			$where="true";
+		$core->genXML($select,$from,$where);
+	}	
+	else if(!isset($act))
+	{
+		$core->redirect("index.php");
+	}
+	switch($act)
+	{
+		case "get_list_mtkul":
+			$core->get_list_mtkul($_REQUEST['KdUser'],$_REQUEST['StatusUser']);
+		break;
+		case "get_list_pert":
+			$core->get_list_pert($_REQUEST['KdPraktikum'],$_REQUEST['KdPengajar'],$_REQUEST['KdMtkul']);
+		break;
+		case "get_list_video":
+			$core->get_list_video($_REQUEST['NIM']);
+		break;		
+		case "get_list_forum":
+			$core->get_list_forum($_REQUEST['KdUser'],$_REQUEST['StatusUser']);
+		break;	
+		case "get_list_pos":
+			$core->get_list_pos($_REQUEST['KdVideo'],$_REQUEST['KdPengajar'],$_REQUEST['KdMtkul'],$_REQUEST['Pertemuan']);
+		break;
+		/*$core->get_list_pos($_REQUEST['Pertemuan'],$_REQUEST['KdPraktikum'],$_REQUEST['KdPengajar'],$_REQUEST['KdVideo'],$_REQUEST['Kelas']);
+		break;*/
+		case "get_list_kelas":
+			$core->get_list_kelas($_REQUEST['KdPengajar']);
+		break;
+		case "get_list_des":
+			$core->get_list_des();
+		break;
+		case "get_kdforum":
+			$core->get_kdforum($_REQUEST['Pertemuan'],$_REQUEST['KdPraktikum'],$_REQUEST['KdPengajar'],$_REQUEST['KdVideo'],$_REQUEST['KdVideo']);
+		break;
+		case "ins_forum":
+			$data=array
+			(
+				"KdForum" => $_REQUEST['KdForum'],
+				"KdPraktikum" => $_REQUEST['KdPraktikum'],				
+				"NamaForum" => $_REQUEST['NamaForum']
+			);
+			$core->insert("forum",$data);
+		break;
+		case "ins_pos":
+			$data=array
+			(
+				"KdForum" => $_REQUEST['KdForum'],
+				"KdPos" => $core->gen_new_kdpos(),
+				"KdUser" => $_REQUEST['KdUser'],
+				"StatusUser" => 'm',
+				"Pos" => $_REQUEST['Pos'],
+				"TglPos" => date("Y-m-d"),
+				"WktPos" => date("H:i:s")
+			);	
+			$core->insert("pos",$data);
+		break;			
+		case "u_video":
+			$data=array
+			(
+				$_REQUEST['cmbKdVideo'],
+				$_FILES['fileVideo'],
+				$_REQUEST['tfVideo'],
+				$_FILES['fileThumbnail'],				
+				$_REQUEST['tfThumbnail'],
+			);
+			$core->upload($data);
+		break;	
+		case "login":
+			$data=array
+			(
+				stripslashes($_POST['tfID']),
+				stripslashes($_POST['tfPass'])
+			);
+			$core->login($data);
+		break;
+		case "logout":
+			$core->logout();
+		break;
+		case "genxml":
+			$data=stripslashes($_REQUEST['tabel']);
+			$core->gen($data);
+		break;
+		case "gensql":
+			$data=stripslashes($_REQUEST['tabel']);
+			$core->genSQL($data);
+		break;
+		case "insert":
+			if($tabel=="mhs")
+			{
+				$data=array
+				(
+					"NIM" => stripslashes($_POST['tfNIM2']),
+					"NamaMhs" => stripslashes($_POST['tfNamaMhs2']),
+					"PassMhs" => md5(stripslashes($_POST['tfPassMhs2'])),
+					"JumPos" => stripslashes($_POST['tfJumPos2'])
+				);				
+			}
+			else if($tabel=="pengajar")
+			{
+				$data=array
+				(
+					"KdPengajar" => stripslashes($_POST['tfKdPengajar2']),
+					"NamaPengajar" => stripslashes($_POST['tfNamaPengajar2']),
+					"PassPengajar" => md5(stripslashes($_POST['tfPassPengajar2'])),
+					"JumPos" => stripslashes($_POST['tfJumPos2'])
+				);				
+			}			
+			else if($tabel=="mtkul")
+			{
+				$data=array
+				(
+					"KdMtkul" => stripslashes($_POST['tfKdMtkul2']),
+					"NamaMtkul" => stripslashes($_POST['tfNamaMtkul2']),
+					"Sks" => stripslashes($_POST['tfSks2'])
+				);				
+			}
+			else if($tabel=="video")
+			{
+				$data=array
+				(
+					"KdVideo" => stripslashes($_POST['tfKdVideo2']),
+					"KdMtkul" => stripslashes($_POST['cmbKdMtkul2']),
+					"KdPengajar" => stripslashes($_POST['cmbKdPengajar2']),
+					"Periode" => stripslashes($_POST['tfPeriode2']),
+					"Semester" => stripslashes($_POST['rbSemester2']),
+					"Pertemuan" => stripslashes($_POST['tfPertemuan2'])
+#					"LinkVideo" => stripslashes($_POST['tfLinkVideo2']),
+#					"LinkGambar" => stripslashes($_POST['tfLinkGambar2'])
+				);				
+			}
+			else if($tabel=="praktikum_h")
+			{
+				$data=array
+				(
+					"KdPraktikum" => stripslashes($_POST['tfKdPraktikum2']),
+					"KdMtkul" => stripslashes($_POST['cmbKdMtkul2']),
+					"KdPengajar" => stripslashes($_POST['cmbKdPengajar2']),
+					"Kelas" => stripslashes($_POST['tfKelas2']),
+					"Ruang" => stripslashes($_POST['tfRuang2']),
+					"StatusPrk" => stripslashes($_POST['cmbStatusPrk2'])					
+				);				
+			}
+			else if($tabel=="praktikum_d_mhs")
+			{
+				$data=array
+				(
+					"KdPraktikum" => stripslashes($_POST['cmbKdPraktikum2']),
+					"NIM" => stripslashes($_POST['cmbNim2'])				
+				);				
+			}
+			else if($tabel=="praktikum_d_materi")
+			{
+				$data=array
+				(
+					"KdPraktikum" => stripslashes($_POST['cmbKdPraktikum2']),
+					"Pertemuan" => stripslashes($_POST['tfPertemuan2']),
+					"KdVideo" => stripslashes($_POST['cmbKdVideo2']),
+					"Materi" => stripslashes($_POST['tfMateri2'])	
+				);				
+			}			
+			else if($tabel=="forum")
+			{
+				if(isset($_POST['chkStatus2']))
+				{
+					if(stripslashes($_POST['chkStatus2'])=="") $stat="0";
+					else $stat="1";
+				}
+				else $stat="0";				
+				$data=array
+				(
+					"KdForum" => stripslashes($_POST['tfKdForum2']),
+					"KdVideo" => stripslashes($_POST['cmbKdVideo2']),					
+					"NamaForum" => stripslashes($_POST['tfNamaForum2']),
+					"StatusKunci" => $stat		
+				);				
+			}				
+			else if($tabel=="pos")
+			{
+				$data=array
+				(
+					"KdForum" => stripslashes($_POST['cmbKdForum2']),
+					"KdPos" => stripslashes($_POST['tfKdPos2']),
+					"KdUser" => stripslashes($_POST['cmbKdUser2']),
+					"StatusUser" => stripslashes($_POST['cmbStatusUser2']),
+					"Pos" => stripslashes($_POST['tfPos2']),
+					"TglPos" => $_POST['cmbThn2']."-".$_POST['cmbBln2']."-".$_POST['cmbTgl2'],
+					"WktPos" => $_POST['tfJam2'].":".$_POST['tfMenit2']
+				);				
+			}										
+			$core->insert($tabel,$data);
+		break;
+		case "update":	
+			if($tabel=="mhs")
+			{
+				$data=array
+				(
+					"NamaMhs" => stripslashes($_POST['tfNamaMhs1']),
+					"PassMhs" => md5(stripslashes($_POST['tfPassMhs1'])),
+					"JumPos" => stripslashes($_POST['tfJumPos1'])
+				);				
+			}
+			else if($tabel=="pengajar")
+			{
+				$data=array
+				(
+					"NamaPengajar" => stripslashes($_POST['tfNamaPengajar1']),
+					"PassPengajar" => md5(stripslashes($_POST['tfPassPengajar1'])),
+					"JumPos" => stripslashes($_POST['tfJumPos1'])
+				);				
+			}			
+			else if($tabel=="mtkul")
+			{
+				$data=array
+				(
+					"NamaMtkul" => stripslashes($_POST['tfNamaMtkul1']),
+					"Sks" => stripslashes($_POST['tfSks1'])
+				);				
+			}
+			else if($tabel=="video")
+			{
+				$data=array
+				(					
+					"KdMtkul" => stripslashes($_POST['cmbKdMtkul1']),
+					"KdPengajar" => stripslashes($_POST['cmbKdPengajar1']),
+					"Periode" => stripslashes($_POST['tfPeriode1']),
+					"Semester" => stripslashes($_POST['rbSemester1']),
+					"Pertemuan" => stripslashes($_POST['tfPertemuan1']),
+					"LinkVideo" => stripslashes($_POST['tfLinkVideo1']),
+					"LinkGambar" => stripslashes($_POST['tfLinkGambar1'])
+				);				
+			}
+			else if($tabel=="praktikum_h")
+			{
+				$data=array
+				(
+					"KdMtkul" => stripslashes($_POST['cmbKdMtkul1']),
+					"KdPengajar" => stripslashes($_POST['cmbKdPengajar1']),
+					"Kelas" => stripslashes($_POST['tfKelas1']),
+					"Ruang" => stripslashes($_POST['tfRuang1']),
+					"StatusPrk" => stripslashes($_POST['cmbStatusPrk1'])					
+				);				
+			}	
+			else if($tabel=="forum")
+			{
+				if(isset($_POST['chkStatus1']))
+				{
+					if(stripslashes($_POST['chkStatus1'])=="") $stat="0";
+					else $stat="1";
+				}
+				else $stat="0";			
+				$data=array
+				(					
+					"KdVideo" => stripslashes($_POST['cmbKdVideo1']),
+					"NamaForum" => stripslashes($_POST['tfNamaForum1']),
+					"StatusKunci" => $stat
+				);				
+			}											
+			$core->update($tabel,$fkd,$kd,$data);
+		break;
+		case "update2":	
+			if($tabel=="pos")
+			{
+				$data=array
+				(
+					"KdUser" => stripslashes($_POST['cmbKdUser1']),
+					"StatusUser" => stripslashes($_POST['cmbStatusUser1']),
+					"Pos" => stripslashes($_POST['tfPos1']),
+					"TglPos" => $_POST['cmbThn1']."-".$_POST['cmbBln1']."-".$_POST['cmbTgl1'],
+					"WktPos" => $_POST['tfJam1'].":".$_POST['tfMenit1']
+				);				
+			}
+			else if($tabel=="praktikum_d_materi")
+			{
+				$data=array
+				(
+					"KdVideo" => stripslashes($_POST['cmbKdVideo1']),
+					"Materi" => stripslashes($_POST['tfMateri1'])
+				);				
+			}					
+			$core->update2($tabel,$fkd,$kd,$data);
+		break;
+		case "delete":			
+			$core->delete($tabel,$fkd,$kd);
+		break;
+		case "delete2":			
+			$core->delete2($tabel,$fkd,$kd);
+		break;
+		case "truncate":			
+			$core->truncate($tabel);
+		break;		
+	}
+?>

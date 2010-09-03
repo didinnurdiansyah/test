@@ -1,0 +1,519 @@
+<?
+	include "MySQLController.php";
+	include "MySQLConverter.php";
+	session_start();
+
+	class AdminPodcast
+	{
+		var $cont;
+		var $conv;
+		var $debug;
+		function AdminPodcast()
+		{
+			$this->debug=false;
+#			$this->debug=true;
+			$this->cont=new MySQLController("localhost","prk","prk","prk");
+#			$this->cont=new MySQLController("localhost","root","","podcast");
+#			$this->cont=new MySQLController("localhost","root","","podcast");
+			$this->conv=new MySQLConverter();
+		}
+		function alternate($i)
+		{
+			if($i%2==1) return 'class="oddRow"';
+			else return 'class="evenRow"';
+		}
+		function focus_css()
+		{
+			return "onfocus=\"javascript:this.className='tfFocusGained';\" onblur=\"javascript:this.className='tfFocusLost';\"";
+		}
+		function icon_sort($order)
+		{
+			if($order==1)
+				echo '<img src="s_asc.png" width="11" height="9" border="0" />';
+			else
+				echo '<img src="s_desc.png" width="11" height="9" border="0" />';
+		}
+		function icon_nav($tipe,$enabled,$tabel="",$page=1)
+		{
+			$str="";
+			switch($tipe)
+			{
+				case 1:
+					if($enabled)
+						$str="<a href=\"javascript:nav('".$tabel."',".$page.")\"><img src=\"b_firstpage.png\" alt=\"first\" width=\"16\" height=\"13\" border=\"0\" title=\"first\"/></a>";
+					else
+						$str="<img src=\"bd_firstpage.png\" alt=\"first\" width=\"16\" height=\"13\" border=\"0\" title=\"first\"/>";
+				break;
+				case 2:
+					if($enabled)
+						$str="<a href=\"javascript:nav('".$tabel."',".$page.")\"><img src=\"b_prevpage.png\" alt=\"prev\" width=\"8\" height=\"13\" border=\"0\" title=\"prev\"/></a>";
+					else
+						$str="<img src=\"bd_prevpage.png\" alt=\"prev\" width=\"8\" height=\"13\" border=\"0\" title=\"prev\"/>";
+				break;
+				case 3:
+					if($enabled)
+						$str="<a href=\"javascript:nav('".$tabel."',".$page.")\"><img src=\"b_nextpage.png\" alt=\"next\" width=\"8\" height=\"13\" border=\"0\" title=\"next\"/></a>";
+					else
+						$str="<img src=\"bd_nextpage.png\" alt=\"next\" width=\"8\" height=\"13\" border=\"0\" title=\"next\"/>";
+				break;
+				case 4:
+					if($enabled)
+						$str="<a href=\"javascript:nav('".$tabel."',".$page.")\"><img src=\"b_lastpage.png\" alt=\"last\" width=\"16\" height=\"13\" border=\"0\" title=\"last\"/></a>";
+					else
+						$str="<img src=\"bd_lastpage.png\" alt=\"last\" width=\"16\" height=\"13\" border=\"0\" title=\"last\"/>";
+				break;
+			}
+			echo $str;
+		}
+		function upload($data)
+		{
+			$scfn=$_SERVER['SCRIPT_FILENAME'];
+			$uploaddir=substr($scfn,0,strrpos($scfn,"/"));
+			if($this->debug) echo $uploaddir;
+
+			if($data[2]=="") $vname=$data[1]['name'];
+			else $vname=$data[2];
+			if($data[4]=="") $tname=$data[3]['name'];
+			else $tname=$data[4];
+
+			$upv=move_uploaded_file($data[1]['tmp_name'],$uploaddir."/Video/".$vname); #video
+			$upt=move_uploaded_file($data[3]['tmp_name'],$uploaddir."/Thumb/".$tname);	#thumbnail
+			if($this->debug) echo $upv."-".$upt;
+
+			$sql="update video set LinkVideo='http://".$_SERVER['HTTP_HOST']."/admin_podcast/Video/".$vname."', ";
+			$sql.="LinkGambar='http://".$_SERVER['HTTP_HOST']."/admin_podcast/Thumb/".$tname."' where KdVideo='".$data[0]."'";
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) $this->redirect("index.php?act=u_video&err=301");
+			else $this->redirect("index.php?act=u_video&err=399");
+		}
+		function gen_select($tab,$c_field,$c_value,$s_field,$s_ord)
+		{
+			$sql="select * from ".$tab;
+			if($c_field!="" && $c_value!="")
+				$sql.=" where ".$c_field." like '%".$c_value."%'";
+			$sql.=" order by ".$s_field;
+			if($this->debug) echo $sql;
+			if($s_ord==2) $sql.=" desc";
+			return $sql;
+		}
+		function gen_c_field($tab,$cf)
+		{
+			$sql="select * from ".$tab;
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			for($i=0;$i<mysql_num_fields($res);$i++)
+			{
+				$meta = mysql_fetch_field($res,$i);
+			  echo "<option value=\"".$meta->name."\"";
+				if($cf==$meta->name) echo " selected=\"selected\"";
+				echo ">".$meta->name."</option>";
+			}
+		}
+		function redirect($addr)
+		{
+			echo '<meta http-equiv="refresh" content="0;URL='.$addr.'">';
+#			header("Location: ".$addr);
+		}
+		function login($data)
+		{
+			if($data[0]=="")
+			{
+				$this->redirect("index.php?err=2");
+			}
+			else if($data[1]=="")
+			{
+				$this->redirect("index.php?err=3");
+			}
+			else
+			{
+				$sql="select * from admin where kdadmin = '".$data[0]."' and passadmin = '".md5($data[1])."' ";
+				$res=$this->cont->query($sql);
+				$num_rows=mysql_num_rows($res);
+				if($num_rows!=1)
+				{
+					$this->redirect("index.php?err=1");
+				}
+				else
+				{
+					$row=mysql_fetch_array($res,MYSQL_BOTH);
+					$_SESSION['kdadmin']=$row[0];
+					$_SESSION['namaadmin']=$row[1];
+					$this->redirect("index.php");
+				}
+			}
+		}
+		function logout()
+		{
+			session_destroy();
+			$this->redirect("index.php");
+		}
+		function gen($nmtabel)
+		{
+			$sql="select * from ".$nmtabel;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else $this->conv->ubah($res,$nmtabel);
+		}
+		function genXML($s,$f,$w)
+		{
+			$sql="select ".$s." from ".$f." where ".$w;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else $this->conv->ubah($res,"custom",$sql);
+		}
+		function genSQL($nmtabel)
+		{
+			$sql="show create table ".$nmtabel;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else
+			{
+				header("Content-type: text/plain");
+				$row=mysql_fetch_array($res,MYSQL_BOTH);
+				echo "/*Table structure for table `".$row[0]."` */\n\n";
+				echo $row[1];
+			}
+		}
+		function ada_data_kosong($data)
+		{
+			$values=array_values($data);
+			for($i=0;$i<sizeof($data);$i++)
+				if($values[$i]=="") return true;
+			return false;
+		}
+		function delete($tabel,$fkode,$kode)
+		{
+			if($tabel=="video")
+			{
+				$scfn=$_SERVER['SCRIPT_FILENAME'];
+				$uploaddir=substr($scfn,0,strrpos($scfn,"/"));			
+				$sql="select LinkVideo,LinkGambar from video where ".$fkode."='".$kode."'";
+				$res=$this->cont->query($sql);
+				$row=mysql_fetch_array($res,MYSQL_BOTH);
+#				echo $row[0]."<br>".$row[1]."<br>";
+				$vn=$uploaddir."/Video".substr($row[0],strrpos($row[0],"/"));
+				$tn=$uploaddir."/Thumb".substr($row[1],strrpos($row[1],"/"));
+				$f1=unlink($vn);
+				$f2=unlink($tn);
+				if($this->debug)
+				{
+					echo $vn."<br>".$tn."<br>";	
+					echo $f1."_".$f2."<br>";			
+				}				
+			}
+			$sql="delete from ".$tabel." where ".$fkode."='".$kode."'";
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);			
+			if(!$res) $this->redirect("index.php?act=m_".$tabel."&err=103");
+			else $this->redirect("index.php?act=m_".$tabel);
+		}
+		function delete2($tabel,$fkode,$kode)
+		{
+			$fkds=explode("_",$fkode);
+			$kds=explode("_",$kode);
+			$sql="delete from ".$tabel." where ";
+			for($i=0;$i<sizeof($fkds);$i++)
+			{
+				if($i>0) $sql.="and ";
+				$sql.=$fkds[$i]."='".$kds[$i]."' ";
+			}
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) $this->redirect("index.php?act=m_".$tabel."&err=103");
+			else $this->redirect("index.php?act=m_".$tabel);
+		}
+		function update($tabel,$fkode,$kode,$data)
+		{
+			if($this->ada_data_kosong($data))
+				$this->redirect("index.php?act=m_".$tabel."&err=201");
+			else
+			{
+				$sql="update ".$tabel." set ";
+				$names=array_keys($data);
+				$values=array_values($data);
+				for($i=0;$i<sizeof($data);$i++)
+				{
+					if($i>0) $sql.=",";
+					$sql.=$names[$i]."='".$values[$i]."'";
+				}
+				$sql.=" where ".$fkode."='".$kode."'";
+				if($this->debug) echo $sql;
+				$res=$this->cont->query($sql);
+				if(!$res) $this->redirect("index.php?act=m_".$tabel."&err=102");
+				else $this->redirect("index.php?act=m_".$tabel);
+			}
+		}
+		function update2($tabel,$fkode,$kode,$data)
+		{
+			if($this->ada_data_kosong($data))
+				$this->redirect("index.php?act=m_".$tabel."&err=201");
+			else
+			{
+				$sql="update ".$tabel." set ";
+				$names=array_keys($data);
+				$values=array_values($data);
+				for($i=0;$i<sizeof($data);$i++)
+				{
+					if($i>0) $sql.=",";
+					$sql.=$names[$i]."='".$values[$i]."'";
+				}
+				$fkds=explode("_",$fkode);
+				$kds=explode("_",$kode);
+				$sql.=" where ";
+				for($i=0;$i<sizeof($fkds);$i++)
+				{
+					if($i>0) $sql.="and ";
+					$sql.=$fkds[$i]."='".$kds[$i]."' ";
+				}
+				if($this->debug) echo $sql;
+				$res=$this->cont->query($sql);
+				if(!$res) $this->redirect("index.php?act=m_".$tabel."&err=102");
+				else $this->redirect("index.php?act=m_".$tabel);
+			}
+		}
+		function insert($tabel,$data)
+		{
+			if($this->ada_data_kosong($data))
+				$this->redirect("index.php?act=m_".$tabel."&err=201");
+			else
+			{
+				$sql="insert into ".$tabel."(";
+				$names=array_keys($data);
+				$values=array_values($data);
+				for($i=0;$i<sizeof($names);$i++)
+				{
+					if($i>0) $sql.=",";
+					$sql.=$names[$i];
+				}
+				$sql.=") values(";
+				for($i=0;$i<sizeof($values);$i++)
+				{
+					if($i>0) $sql.=",";
+					$sql.="'".$values[$i]."'";
+				}
+				$sql.=")";
+				if($this->debug) echo $sql;
+				$res=$this->cont->query($sql);
+				if(!$res) $this->redirect("index.php?act=m_".$tabel."&err=101");
+				else $this->redirect("index.php?act=m_".$tabel);
+			}
+		}
+		function truncate($tabel)
+		{
+			$sql="truncate table ".$tabel;
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) $this->redirect("index.php?act=m_".$tabel."&err=104");
+			else $this->redirect("index.php?act=m_".$tabel);
+		}
+		function get_list_video($nim)
+		{
+			$sql="select a.Pertemuan,Materi,a.KdVideo,LinkVideo ".
+				"from praktikum_d_materi a ".
+				"join praktikum_d_mhs b on a.KdPraktikum=b.KdPraktikum ".
+				"join video c on a.KdVideo=c.KdVideo ".
+				"where NIM='".$nim."'";
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else $this->conv->ubah($res,"custom",$sql);
+		}
+		function get_list_mtkul($kdUser,$stUser)
+		{
+			if($stUser=='m')
+			{
+				$sql="select a.KdPraktikum,a.KdMtkul,NamaMtkul ".
+					"from praktikum_h a ".
+					"join praktikum_d_mhs b on a.KdPraktikum = b.KdPraktikum ".
+					"join mtkul c on a.KdMtkul = c.KdMtkul ".
+					"where b.NIM='".$kdUser."' ".
+					"order by 1";
+			}
+			else
+			{
+				$sql="select distinct a.KdMtkul,NamaMtkul ".
+					"from praktikum_h a join mtkul b ".
+					"on a.KdMtkul = b.KdMtkul ".
+					"where KdPengajar='".$kdUser."' ".
+					"order by 1";
+			}
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else $this->conv->ubah($res,"custom",$sql);
+		}
+		function get_list_pert($kdpraktikum,$kdpengajar='',$kdmtkul='')
+		{
+			if($kdpengajar!='' and $kdmtkul!='')
+			{
+				$sql="select KdPraktikum ".
+					"from praktikum_h ".
+					"where KdPengajar='".$kdpengajar."' ".
+					"and KdMtkul='".$kdmtkul."' limit 1";
+				$res=$this->cont->query($sql);
+				$row=mysql_fetch_array($res,MYSQL_BOTH);
+				$kdpraktikum=$row[0];
+			}				
+			$sql = "select a.Pertemuan,a.KdVideo,Materi,LinkVideo,LinkGambar ".
+				"from praktikum_d_materi a, video b ".
+				"where a.KdVideo = b.KdVideo ".
+				"and KdPraktikum ='".$kdpraktikum."'";
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else $this->conv->ubah($res,"custom",$sql);
+		}
+		function get_list_forum($kdUser,$stUser)
+		{
+			if($stUser=='m')
+			{
+				$sql="select KdForum,NamaForum ".
+					"from forum a ".
+					"join praktikum_h b on a.KdPraktikum=b.KdPraktikum ".
+					"join praktikum_d_mhs c on b.KdPraktikum=c.KdPraktikum ".
+					"where NIM='".$kdUser."'";
+			}
+			else
+			{
+				$sql="select KdForum,NamaForum ".
+					"from forum a ".
+					"join praktikum_h b on a.KdPraktikum=b.KdPraktikum ".
+					"where KdPengajar='".$kdUser."'";
+			}
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else $this->conv->ubah($res,"custom",$sql);
+		}
+		/*function get_list_pos($pertemuan,$kdpraktikum,$kdpengajar,$kdvideo,$kelas)
+		{
+			$kdforum="";
+			if($kdpraktikum=="") 	#--> buat dosen
+			{
+				$sql = "select KdForum from forum a ".
+					"join video b on a.KdVideo=b.KdVideo ".
+					"join praktikum_d_materi c on b.KdVideo=c.KdVideo ".
+					"join praktikum_h d on c.KdPraktikum=d.KdPraktikum ".
+					"where KdPengajar='".$kdpengajar."' ".
+					"and b.KdVideo='".$kdvideo."' ".
+					"and Kelas='".$kelas."' ".
+					"and Pertemuan=".$pertemuan;
+			}
+			else			#--> buat mhs
+			{
+				$sql = "select KdForum from forum a ".
+					"join video b on a.KdVideo=b.KdVideo ".
+					"join praktikum_d_materi c on c.KdVideo=b.KdVideo ".
+					"join praktikum_h d on d.KdPraktikum=c.KdPraktikum ".
+					"where d.KdPraktikum='".$kdpraktikum."' ".
+					"and c.Pertemuan=".$pertemuan;
+			}
+			$res=$this->cont->query($sql);
+			$row=mysql_fetch_array($res,MYSQL_BOTH);
+			$kdforum=$row[0];
+			$sql = "select * from pos where KdForum = '".$kdforum."'";
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else $this->conv->ubah($res,"custom",$sql);
+		}*/
+		##
+		function get_list_pos($kdvideo,$kdpengajar='',$kdmtkul='',$pert='')
+		{
+			if($kdpengajar!='' and $kdmtkul!='' and $pert!='')
+			{
+				$sql="select KdVideo ".
+					"from praktikum_h a, praktikum_d_materi b ".
+					"where a.KdPraktikum = b.KdPraktikum ".
+					"and a.KdMtkul='".$kdmtkul."' ".
+					"and a.KdPengajar='".$kdpengajar."' ".
+					"and b.Pertemuan=".$pert;
+				$res=$this->cont->query($sql);
+				$row=mysql_fetch_array($res,MYSQL_BOTH);
+				$kdvideo=$row[0];	
+			}
+			$sql = "select a.* from pos a, forum b where a.KdForum = b.KdForum and KdVideo = '".$kdvideo."'";
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else $this->conv->ubah($res,"custom",$sql);
+		}	
+		function get_list_kelas($kdpengajar)
+		{
+			$sql = "select Kelas from praktikum_h where KdPengajar = '".$kdpengajar."'";
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else $this->conv->ubah($res,"custom",$sql);
+		}
+		function gen_new_kdtopik()
+		{
+			$sql = "select KdTopik from topik ".
+				"order by KdTopik desc limit 1";
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			$row=mysql_fetch_array($res,MYSQL_BOTH);
+			$n=substr($row[0],2,3);
+			return sprintf("tp%03d",$n+1);
+		}
+		function gen_new_kdpos()
+		{
+			$sql = "select KdPos from pos ".
+				"order by KdPos desc limit 1";
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			$num_rows=mysql_num_rows($res);			
+			$new_kd="";
+			if($num_rows==0) 
+			{
+				$new_kd="ps001";
+			}
+			else
+			{
+				$row=mysql_fetch_array($res,MYSQL_BOTH);			
+				$n=substr($row[0],2,3);
+				$new_kd=sprintf("ps%03d",$n+1);
+			}
+			return $new_kd;
+		}
+		function get_list_des()
+		{
+			$sql = "select distinct b.Materi, a.LinkVideo from video a, praktikum_d_materi b where a.KdVideo = b.KdVideo";
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else $this->conv->ubah($res,"custom",$sql);
+		}
+		function get_kdforum($pertemuan,$kdpraktikum,$kdpengajar,$kdvideo,$kelas)
+		{
+			$kdforum="";
+			if($kdpraktikum=="") 	#--> buat dosen
+			{
+				$sql = "select KdForum from forum a ".
+					"join video b on a.KdVideo=b.KdVideo ".
+					"join praktikum_d_materi c on b.KdVideo=c.KdVideo ".
+					"join praktikum_h d on c.KdPraktikum=d.KdPraktikum ".
+					"where KdPengajar='".$kdpengajar."' ".
+					"and b.KdVideo='".$kdvideo."' ".
+					"and Kelas='".$kelas."' ".
+					"and Pertemuan=".$pertemuan;
+			}
+			else			#--> buat mhs
+			{
+				$sql = "select KdForum from forum a ".
+					"join video b on a.KdVideo=b.KdVideo ".
+					"join praktikum_d_materi c on c.KdVideo=b.KdVideo ".
+					"join praktikum_h d on d.KdPraktikum=c.KdPraktikum ".
+					"where d.KdPraktikum='".$kdpraktikum."' ".
+					"and c.Pertemuan=".$pertemuan;
+			}
+			if($this->debug) echo $sql;
+			$res=$this->cont->query($sql);
+			if(!$res) echo "Error!";
+			else $this->conv->ubah($res,"custom",$sql);
+		}
+	}
+?>
